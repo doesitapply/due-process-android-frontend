@@ -1,0 +1,224 @@
+{
+  "appName": "DueProcess AI",
+  "platform": "Android",
+  "framework": "Jetpack Compose",
+  "positioning": "Secure litigation intelligence app for evidence capture, AI-assisted legal analysis, source-grounded findings, and court-ready report generation.",
+  "uxPrinciple": "Evidence first, claims second. Every claim must show whether it is proven, inferred, missing, blocked, or ready to export.",
+  "primaryNavigation": [
+    "Cases",
+    "Evidence",
+    "Findings",
+    "Reports",
+    "More"
+  ],
+  "screens": [
+    {
+      "name": "Login",
+      "route": "login",
+      "purpose": "Authenticate user securely.",
+      "features": [
+        "Corporate email login",
+        "Access key login",
+        "Biometric unlock",
+        "Session restore",
+        "Forgot access flow"
+      ]
+    },
+    {
+      "name": "Case Dashboard",
+      "route": "cases",
+      "purpose": "Show active, draft, and archived cases.",
+      "features": [
+        "Urgent deadline strip",
+        "Failed upload warnings",
+        "Case cards",
+        "Document count",
+        "Finding count",
+        "Missing record count",
+        "QC blocked indicator",
+        "Sync status"
+      ]
+    },
+    {
+      "name": "Evidence & Documents",
+      "route": "evidence",
+      "purpose": "Manage all uploaded/captured legal sources.",
+      "features": [
+        "Scan document",
+        "Upload file",
+        "Record audio",
+        "Take photo",
+        "Import from Drive",
+        "Document categories",
+        "AI summary",
+        "OCR quality score",
+        "Processing status",
+        "Retry failed extraction"
+      ]
+    },
+    {
+      "name": "Document Detail",
+      "route": "document/{documentId}",
+      "purpose": "Review the source before trusting AI output.",
+      "features": [
+        "PDF/image/audio/video preview",
+        "Extracted text",
+        "Source anchors",
+        "OCR warnings",
+        "Linked findings",
+        "Reprocess document",
+        "Run agents on document"
+      ]
+    },
+    {
+      "name": "Findings Dashboard",
+      "route": "findings",
+      "purpose": "Triage AI-extracted facts, contradictions, missing records, and legal authorities.",
+      "features": [
+        "Filter by finding type",
+        "Filter by severity",
+        "Filter by QC status",
+        "Sort by confidence",
+        "Sort by leverage score",
+        "Source count",
+        "Blocked export indicator"
+      ]
+    },
+    {
+      "name": "Finding Detail",
+      "route": "finding/{findingId}",
+      "purpose": "Show why a finding exists and whether it is trustworthy.",
+      "features": [
+        "Summary",
+        "Confidence meter",
+        "Severity",
+        "Source anchors",
+        "Exact quote verification",
+        "Missing records",
+        "Legal authorities",
+        "Audit history",
+        "Approve",
+        "Downgrade",
+        "Block",
+        "Add to report"
+      ]
+    },
+    {
+      "name": "Agent Runner",
+      "route": "agents/run",
+      "purpose": "Run specialist legal agents against selected evidence.",
+      "features": [
+        "Scope selector",
+        "Agent selector",
+        "Cost estimate",
+        "Run progress",
+        "Retry failed agent",
+        "QC audit phase"
+      ]
+    },
+    {
+      "name": "Reports Builder",
+      "route": "reports",
+      "purpose": "Generate evidence memos, chronologies, contradiction reports, and case packets.",
+      "features": [
+        "Template selector",
+        "Finding selector",
+        "Confidence minimum",
+        "Include source appendix",
+        "Blocked finding toggle",
+        "Preview",
+        "Generate PDF",
+        "Generate DOCX",
+        "Share/export"
+      ]
+    }
+  ],
+  "requiredBackendServices": {
+    "Authentication": [
+      "mobile login",
+      "refresh token",
+      "logout",
+      "current user"
+    ],
+    "CaseManagement": [
+      "create case",
+      "list cases",
+      "update case",
+      "archive case",
+      "case dashboard stats"
+    ],
+    "DocumentStorage": [
+      "signed upload URL",
+      "complete upload",
+      "document status",
+      "download URL",
+      "delete document"
+    ],
+    "DocumentProcessing": [
+      "OCR",
+      "text extraction",
+      "audio transcription",
+      "extraction quality scoring",
+      "document summary"
+    ],
+    "AgenticAI_Pipeline": [
+      "start agent run",
+      "poll run status",
+      "return partial results",
+      "QC audit",
+      "retry failed agent"
+    ],
+    "FindingsEngine": [
+      "store findings",
+      "source anchors",
+      "quote verification",
+      "confidence scores",
+      "audit history",
+      "QC status"
+    ],
+    "Reports": [
+      "create report",
+      "preview report",
+      "download PDF",
+      "download DOCX",
+      "store generated report"
+    ],
+    "BillingEntitlements": [
+      "current plan",
+      "usage limits",
+      "agent run limits",
+      "document limits",
+      "report export permissions"
+    ],
+    "Sync": [
+      "offline mutation queue",
+      "pull changes",
+      "push local changes",
+      "conflict resolution"
+    ]
+  },
+  "mustHaveDataModels": [
+    "UserSession",
+    "Case",
+    "Document",
+    "UploadJob",
+    "AgentRun",
+    "Agent",
+    "Finding",
+    "SourceAnchor",
+    "FindingAudit",
+    "GeneratedReport",
+    "Entitlement",
+    "SyncMutation",
+    "ApiError"
+  ],
+  "nonNegotiables": [
+    "Android never connects directly to the database.",
+    "All uploads use signed URLs.",
+    "All private evidence stays behind authenticated backend services.",
+    "Every finding links back to source anchors.",
+    "Every direct quote gets exact-match verification.",
+    "Blocked or low-confidence findings are excluded from reports by default.",
+    "Offline capture must preserve local files until sync succeeds."
+  ]
+}
