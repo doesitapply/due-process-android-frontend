@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,7 +34,7 @@ fun MainScreen(rootNavController: NavController) {
             composable("evidence") { EvidenceInboxScreen(navController) }
             composable("findings") { FindingsDashboardScreen(navController) }
             composable("reports") { ReportsDashboardScreen(navController) }
-            composable("more") { Text("More Screen Placeholder") }
+            composable("agents") { AgentRunnerScreen(navController) }
         }
     }
 }
@@ -50,9 +51,9 @@ fun AppBottomBar(navController: NavHostController) {
         val items = listOf(
             NavItem("cases", "Cases", Icons.Default.FolderOpen),
             NavItem("evidence", "Evidence", Icons.Default.Analytics),
-            NavItem("findings", "Findings", Icons.Default.FactCheck),
+            NavItem("findings", "Findings", Icons.AutoMirrored.Filled.FactCheck),
             NavItem("reports", "Reports", Icons.Default.Description),
-            NavItem("more", "More", Icons.Default.MoreHoriz)
+            NavItem("agents", "Agents", Icons.Default.AutoAwesome)
         )
 
         items.forEach { item ->

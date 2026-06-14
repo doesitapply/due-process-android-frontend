@@ -48,18 +48,37 @@ fun FindingsDashboardScreen(navController: NavController) {
             item {
                 Text("Reviewing extracted facts and identified anomalies.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(16.dp))
-                // Pending QC
+                // Provenance Knowledge Graph (Simulated)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                        .padding(12.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha=0.5f), RoundedCornerShape(8.dp))
+                        .padding(16.dp)
                 ) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Pending QC", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("14", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            Text("PROVENANCE GRAPH", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        // Draw a quick simulated node network
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(32.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp)).border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                                Text("Ev", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                            HorizontalDivider(modifier = Modifier.weight(1f).padding(horizontal=4.dp), color = MaterialTheme.colorScheme.primary.copy(alpha=0.3f), thickness = 2.dp)
+                            Box(modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(24.dp)).border(2.dp, MaterialTheme.colorScheme.error, RoundedCornerShape(24.dp)), contentAlignment = Alignment.Center) {
+                                Text("! 14", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                            }
+                            HorizontalDivider(modifier = Modifier.weight(1f).padding(horizontal=4.dp), color = MaterialTheme.colorScheme.primary.copy(alpha=0.3f), thickness = 2.dp)
+                            Box(modifier = Modifier.size(32.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp)).border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                                Text("Ts", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("14 High-Leverage Contradictions detected across 312 evidence nodes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
