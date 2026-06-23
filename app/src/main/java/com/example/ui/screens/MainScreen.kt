@@ -14,11 +14,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.data.repository.CaseRepository
 
 data class NavItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 @Composable
-fun MainScreen(rootNavController: NavController) {
+fun MainScreen(rootNavController: NavController, repository: CaseRepository) {
 
     val navController = rememberNavController()
 
@@ -30,11 +31,11 @@ fun MainScreen(rootNavController: NavController) {
             startDestination = "cases",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("cases") { CaseDashboardScreen(navController) }
-            composable("evidence") { EvidenceInboxScreen(navController) }
-            composable("findings") { FindingsDashboardScreen(navController) }
-            composable("reports") { ReportsDashboardScreen(navController) }
-            composable("agents") { AgentRunnerScreen(navController) }
+            composable("cases") { CaseDashboardScreen(navController, repository) }
+            composable("evidence") { EvidenceInboxScreen(navController, repository) }
+            composable("findings") { FindingsDashboardScreen(navController, repository) }
+            composable("reports") { ReportsDashboardScreen(navController, repository) }
+            composable("agents") { AgentRunnerScreen(navController, repository) }
         }
     }
 }

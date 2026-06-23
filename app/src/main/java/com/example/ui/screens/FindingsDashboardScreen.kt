@@ -4,12 +4,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -17,10 +21,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.data.repository.CaseRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FindingsDashboardScreen(navController: NavController) {
+fun FindingsDashboardScreen(navController: NavController, repository: CaseRepository) {
+    val findings by repository.localFindings.collectAsState(initial = emptyList())
+
+    LaunchedEffect(Unit) {
+        runCatching { repository.refreshFindingsFromServer() }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -78,7 +89,7 @@ fun FindingsDashboardScreen(navController: NavController) {
                             }
                         }
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("14 High-Leverage Contradictions detected across 312 evidence nodes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${findings.size} source-bound findings synced from DueProcess backend.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -92,24 +103,26 @@ fun FindingsDashboardScreen(navController: NavController) {
                 }
             }
 
-            // Finding Cards
-            item {
-                FindingCard(
-                    tag = "CONTRADICTION", tagColor = MaterialTheme.colorScheme.error,
-                    title = "Defendant Location Mismatch during Key Timeline",
-                    desc = "Deposition transcript states defendant was at the office. Cell tower location...",
-                    sev = "HIGH SEV", sevColor = MaterialTheme.colorScheme.error, bgSev = MaterialTheme.colorScheme.errorContainer.copy(0.2f),
-                    conf = "94%", sources = "2 Linked", action = "Review Evidence"
-                )
-            }
-            item {
-                FindingCard(
-                    tag = "MISSING RECORD", tagColor = MaterialTheme.colorScheme.primary,
-                    title = "Absence of Communication Logs for Q3",
-                    desc = "AI expected email communications referenced in witness statement...",
-                    sev = "MED SEV", sevColor = MaterialTheme.colorScheme.onSecondaryContainer, bgSev = MaterialTheme.colorScheme.secondaryContainer,
-                    conf = "N/A", sources = "Missing Critical", action = "Request Docs"
-                )
+            if (findings.isEmpty()) {
+                item {
+                    Text("No synced findings yet. Run Legal Analysis after evidence is processed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                items(findings, key = { it.id }) { finding ->
+                    val highRisk = finding.severity.equals("high", true) || finding.severity.equals("critical", true)
+                    FindingCard(
+                        tag = finding.tag.uppercase(),
+                        tagColor = if (highRisk) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        title = finding.title,
+                        desc = finding.description,
+                        sev = "${finding.severity.uppercase()} SEV",
+                        sevColor = if (highRisk) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSecondaryContainer,
+                        bgSev = if (highRisk) MaterialTheme.colorScheme.errorContainer.copy(0.2f) else MaterialTheme.colorScheme.secondaryContainer,
+                        conf = "${finding.confidenceScore}%",
+                        sources = finding.documentId,
+                        action = finding.actionRequired.ifBlank { finding.status }
+                    )
+                }
             }
         }
     }

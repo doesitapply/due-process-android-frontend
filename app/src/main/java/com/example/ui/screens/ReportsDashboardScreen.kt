@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -14,19 +17,58 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.data.models.ReportEntity
+import com.example.data.repository.CaseRepository
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReportsDashboardScreen(navController: NavController) {
-    var selectedTemplate by remember { mutableStateOf("Case Chronology") }
-    val templates = listOf("Case Chronology", "Evidence Memo", "Contradiction Report", "Full Case Packet")
-    var selectedScope by remember { mutableStateOf("Selected Findings") }
+fun ReportsDashboardScreen(navController: NavController, repository: CaseRepository) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val reports by repository.localReports.collectAsState(initial = emptyList())
+    val documents by repository.localDocuments.collectAsState(initial = emptyList())
+    val readyDocuments = documents.filter { it.analysisReady }
+    val selectedDocumentIds = remember { mutableStateListOf<String>() }
+    var selectedTemplate by remember { mutableStateOf("War Room Summary") }
+    val templates = listOf("War Room Summary", "Timeline/Gaps", "Discovery Demands", "Immunity Pathway", "Court Packet")
+    var selectedScope by remember { mutableStateOf("Full Case") }
     var confidenceMin by remember { mutableStateOf(85f) }
     var includeBlocked by remember { mutableStateOf(false) }
     var includeSource by remember { mutableStateOf(true) }
+    var isGenerating by remember { mutableStateOf(false) }
+    var exportingReportId by remember { mutableStateOf<String?>(null) }
+    var pendingExportContent by remember { mutableStateOf<String?>(null) }
+    var pendingExportFileName by remember { mutableStateOf("dueprocess-report.md") }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/markdown")) { uri: Uri? ->
+        val content = pendingExportContent
+        if (uri != null && content != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri).use { output ->
+                    requireNotNull(output) { "Unable to open export destination." }
+                    output.write(content.toByteArray())
+                }
+            }.onSuccess {
+                statusMessage = "Report exported to selected file."
+            }.onFailure { error ->
+                statusMessage = error.message ?: "Report export failed."
+            }
+        }
+        pendingExportContent = null
+    }
+
+    LaunchedEffect(Unit) {
+        runCatching {
+            repository.refreshReportsFromServer()
+            repository.refreshDocumentsFromServer()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -76,8 +118,40 @@ fun ReportsDashboardScreen(navController: NavController) {
                             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                             .padding(4.dp)
                     ) {
-                        ScopeButton("Selected Findings", selectedScope == "Selected Findings", Modifier.weight(1f)) { selectedScope = "Selected Findings" }
+                        ScopeButton("Selected Files", selectedScope == "Selected Files", Modifier.weight(1f)) { selectedScope = "Selected Files" }
                         ScopeButton("Full Case", selectedScope == "Full Case", Modifier.weight(1f)) { selectedScope = "Full Case" }
+                    }
+
+                    if (selectedScope == "Selected Files") {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        if (readyDocuments.isEmpty()) {
+                            Text("No ready files are available for report scope.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                readyDocuments.take(8).forEach { document ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Checkbox(
+                                            checked = selectedDocumentIds.contains(document.id),
+                                            onCheckedChange = { checked ->
+                                                if (checked) selectedDocumentIds.add(document.id) else selectedDocumentIds.remove(document.id)
+                                            },
+                                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                                        )
+                                        Column {
+                                            Text(document.title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                                            Text("${document.category} • ${document.qualityScore}% OCR", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -117,25 +191,79 @@ fun ReportsDashboardScreen(navController: NavController) {
             }
 
             item {
-                SectionCard(title = "Preview (3)") {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        PreviewItem("Contradiction in Deposition Transcript regarding timeline of events.", "DOC-042", "92% CONF")
-                        PreviewItem("Missing email attachment from main evidence bundle.", "EML-891", "88% CONF")
-                        PreviewItem("Financial anomaly detected in Q3 ledger vs declared earnings.", "XLS-011", "98% CONF")
+                SectionCard(title = "Saved Reports (${reports.size})") {
+                    if (reports.isEmpty()) {
+                        Text("No synced reports yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            reports.take(6).forEach { report ->
+                                PreviewItem(
+                                    report = report,
+                                    isExporting = exportingReportId == report.id,
+                                    onExport = {
+                                        scope.launch {
+                                            exportingReportId = report.id
+                                            statusMessage = null
+                                            try {
+                                                val exported = repository.exportReport(report.id, "markdown")
+                                                pendingExportContent = exported.content
+                                                pendingExportFileName = exported.fileName.ifBlank { report.fileName.ifBlank { "dueprocess-report.md" } }
+                                                exportLauncher.launch(pendingExportFileName)
+                                            } catch (error: Exception) {
+                                                statusMessage = error.message ?: "Report export failed."
+                                            } finally {
+                                                exportingReportId = null
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
+                }
+            }
+
+            if (statusMessage != null) {
+                item {
+                    Text(statusMessage ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             
             item {
                 Button(
-                    onClick = { /* Generate Report */ },
+                    onClick = {
+                        isGenerating = true
+                        statusMessage = null
+                        scope.launch {
+                            try {
+                                repository.generateReport(
+                                    scope = if (selectedScope == "Full Case") "case" else "files",
+                                    documentIds = if (selectedScope == "Full Case") emptyList() else selectedDocumentIds.mapNotNull { it.toIntOrNull() },
+                                    template = templateKey(selectedTemplate),
+                                    minConfidence = confidenceMin.toInt(),
+                                    includeSources = includeSource,
+                                    includeBlockedFindings = includeBlocked
+                                )
+                                statusMessage = "Report generated and synced."
+                            } catch (error: Exception) {
+                                statusMessage = error.message ?: "Report generation failed."
+                            } finally {
+                                isGenerating = false
+                            }
+                        }
+                    },
+                    enabled = !isGenerating && (selectedScope == "Full Case" || selectedDocumentIds.isNotEmpty()),
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) {
                     Icon(Icons.Default.Description, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Generate Report", style = MaterialTheme.typography.headlineSmall)
+                    Text(if (isGenerating) "Generating..." else "Generate Report", style = MaterialTheme.typography.headlineSmall)
+                }
+                if (selectedScope == "Selected Files" && selectedDocumentIds.isEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Choose at least one ready file for selected-file reports.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -177,27 +305,40 @@ fun ScopeButton(text: String, selected: Boolean, modifier: Modifier = Modifier, 
 }
 
 @Composable
-fun PreviewItem(title: String, docId: String, conf: String) {
+fun PreviewItem(report: ReportEntity, isExporting: Boolean, onExport: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(4.dp))
             .padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Checkbox(checked = true, onCheckedChange = { }, colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary))
-        Column {
-            Text(title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(report.title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
             Spacer(modifier = Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp)) {
-                    Text(docId, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(report.fileName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Box(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp)) {
-                    Text(conf, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(report.format.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
+        OutlinedButton(enabled = !isExporting, onClick = onExport, shape = RoundedCornerShape(6.dp)) {
+            Text(if (isExporting) "Exporting" else "Export")
+        }
+    }
+}
+
+private fun templateKey(label: String): String {
+    return when (label) {
+        "Timeline/Gaps" -> "evidence_chronology"
+        "Discovery Demands" -> "discovery_demands"
+        "Immunity Pathway" -> "immunity_relief"
+        "Court Packet" -> "court_packet"
+        else -> "executive_summary"
     }
 }

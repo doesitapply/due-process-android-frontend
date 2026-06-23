@@ -7,15 +7,22 @@ import androidx.room.RoomDatabase
 import com.example.data.dao.CaseDao
 import com.example.data.dao.DocumentDao
 import com.example.data.dao.FindingDao
+import com.example.data.dao.ReportDao
 import com.example.data.models.CaseEntity
 import com.example.data.models.DocumentEntity
 import com.example.data.models.FindingEntity
+import com.example.data.models.ReportEntity
 
-@Database(entities = [CaseEntity::class, DocumentEntity::class, FindingEntity::class], version = 1, exportSchema = false)
+@Database(
+    entities = [CaseEntity::class, DocumentEntity::class, FindingEntity::class, ReportEntity::class],
+    version = 3,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun caseDao(): CaseDao
     abstract fun documentDao(): DocumentDao
     abstract fun findingDao(): FindingDao
+    abstract fun reportDao(): ReportDao
 
     companion object {
         @Volatile
@@ -27,7 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "dueprocess_database"
-                ).build()
+                ).fallbackToDestructiveMigration(true).build()
                 INSTANCE = instance
                 instance
             }

@@ -3,12 +3,23 @@ plugins {
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
-  alias(libs.plugins.secrets)
 }
 
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
+
+  fun buildConfigString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+  val dueProcessApiBaseUrl = providers.environmentVariable("DUEPROCESS_API_BASE_URL")
+    .orElse(providers.gradleProperty("DUEPROCESS_API_BASE_URL"))
+    .orElse("http://10.0.2.2:3014/api/mobile/v1/")
+  val dueProcessMobileAccessKey = providers.environmentVariable("DUEPROCESS_MOBILE_ACCESS_KEY")
+    .orElse(providers.gradleProperty("DUEPROCESS_MOBILE_ACCESS_KEY"))
+    .orElse("")
+  val googleWebClientId = providers.environmentVariable("GOOGLE_WEB_CLIENT_ID")
+    .orElse(providers.gradleProperty("GOOGLE_WEB_CLIENT_ID"))
+    .orElse("DEFAULT_WEB_CLIENT_ID")
 
   defaultConfig {
     applicationId = "com.aistudio.dueprocess.kqnmpz"
@@ -18,6 +29,9 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    buildConfigField("String", "DUEPROCESS_API_BASE_URL", buildConfigString(dueProcessApiBaseUrl.get()))
+    buildConfigField("String", "DUEPROCESS_MOBILE_ACCESS_KEY", buildConfigString(dueProcessMobileAccessKey.get()))
+    buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", buildConfigString(googleWebClientId.get()))
   }
 
   signingConfigs {
@@ -27,12 +41,6 @@ android {
       storePassword = System.getenv("STORE_PASSWORD")
       keyAlias = "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
     }
   }
 
@@ -44,7 +52,6 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
     }
   }
   compileOptions {
@@ -56,13 +63,6 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
-}
-
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
-secrets {
-  propertiesFileName = ".env"
-  defaultPropertiesFileName = ".env.example"
 }
 
 // Some unused dependencies are commented out below instead of being removed.

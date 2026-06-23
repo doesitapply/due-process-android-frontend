@@ -1,10 +1,22 @@
 package com.example.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
@@ -13,35 +25,72 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
-import androidx.credentials.GetCredentialRequest
 import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
 import androidx.navigation.NavController
 import com.example.BuildConfig
 import com.example.R
+import com.example.data.repository.CaseRepository
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
-import android.widget.Toast
 
 @Composable
-fun LoginScreen(navController: NavController) {
+fun LoginScreen(navController: NavController, repository: CaseRepository) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
+    var email by remember { mutableStateOf("") }
+    var accessKey by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
     var isSigningIn by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    fun completeBackendLogin(emailOverride: String? = null, onFinished: () -> Unit = {}) {
+        isLoading = true
+        errorMessage = null
+        scope.launch {
+            try {
+                repository.login(emailOverride ?: email, accessKey)
+                repository.refreshAll()
+                navController.navigate("main") {
+                    popUpTo("login") { inclusive = true }
+                }
+            } catch (error: Exception) {
+                errorMessage = error.message ?: "Login failed"
+            } finally {
+                isLoading = false
+                onFinished()
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -53,7 +102,6 @@ fun LoginScreen(navController: NavController) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth(0.9f)
         ) {
-            // Logo
             Image(
                 painter = painterResource(id = R.drawable.ic_logo),
                 contentDescription = "Logo",
@@ -74,10 +122,9 @@ fun LoginScreen(navController: NavController) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
+
             Spacer(modifier = Modifier.height(32.dp))
-            
-            // Form Card
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -86,11 +133,10 @@ fun LoginScreen(navController: NavController) {
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
                     .padding(24.dp)
             ) {
-                // Secure Badge
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .offset(y = (-36).dp) // Half of padding + height to overlap
+                        .offset(y = (-36).dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surface)
                         .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
@@ -111,12 +157,11 @@ fun LoginScreen(navController: NavController) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Email Field
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("CORPORATE EMAIL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("EMAIL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         OutlinedTextField(
-                            value = "",
-                            onValueChange = {},
+                            value = email,
+                            onValueChange = { email = it },
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("user@firm.com") },
                             leadingIcon = { Icon(Icons.Default.Mail, contentDescription = null) },
@@ -131,17 +176,16 @@ fun LoginScreen(navController: NavController) {
                         )
                     }
 
-                    // Password Field
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("ACCESS KEY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("FORGOT?", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { })
                         }
                         OutlinedTextField(
-                            value = "",
-                            onValueChange = {},
+                            value = accessKey,
+                            onValueChange = { accessKey = it },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("••••••••••••") },
+                            placeholder = { Text("mobile access key") },
                             leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
@@ -155,20 +199,24 @@ fun LoginScreen(navController: NavController) {
                         )
                     }
 
-                    // Login Button
+                    if (errorMessage != null) {
+                        Text(
+                            errorMessage ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
                     Button(
-                        onClick = {
-                            navController.navigate("main") {
-                                popUpTo("login") { inclusive = true }
-                            }
-                        },
+                        onClick = { completeBackendLogin() },
+                        enabled = !isLoading && !isSigningIn,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                     ) {
-                        Text("Secure Login", style = MaterialTheme.typography.headlineSmall)
+                        Text(if (isLoading) "Connecting..." else "Secure Login", style = MaterialTheme.typography.headlineSmall)
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(Icons.Default.ArrowForward, contentDescription = null)
                     }
@@ -179,12 +227,12 @@ fun LoginScreen(navController: NavController) {
                         HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
                     }
 
-                    // Google Sign-In Button
                     OutlinedButton(
                         onClick = {
-                            if (isSigningIn) return@OutlinedButton
+                            if (isSigningIn || isLoading) return@OutlinedButton
                             isSigningIn = true
-                            coroutineScope.launch {
+                            errorMessage = null
+                            scope.launch {
                                 try {
                                     val credentialManager = CredentialManager.create(context)
                                     val googleIdOption = GetGoogleIdOption.Builder()
@@ -199,32 +247,33 @@ fun LoginScreen(navController: NavController) {
 
                                     val result = credentialManager.getCredential(context, request)
                                     val credential = result.credential
-                                    
+
                                     if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                                         val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                                         val firebaseCredential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
-                                        
+
                                         FirebaseAuth.getInstance().signInWithCredential(firebaseCredential).addOnCompleteListener { task ->
                                             if (task.isSuccessful) {
-                                                navController.navigate("main") {
-                                                    popUpTo("login") { inclusive = true }
+                                                val firebaseEmail = task.result.user?.email
+                                                completeBackendLogin(emailOverride = firebaseEmail) {
+                                                    isSigningIn = false
                                                 }
                                             } else {
-                                                Toast.makeText(context, "Google Sign-In failed: " + task.exception?.message, Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Google Sign-In failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                                                 isSigningIn = false
                                             }
                                         }
                                     } else {
-                                         Toast.makeText(context, "Unexpected credential type.", Toast.LENGTH_SHORT).show()
-                                         isSigningIn = false
+                                        Toast.makeText(context, "Unexpected credential type.", Toast.LENGTH_SHORT).show()
+                                        isSigningIn = false
                                     }
-                                } catch (e: Exception) {
-                                    // Normally you'd handle GetCredentialException properly
-                                    Toast.makeText(context, "Sign-in error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                } catch (error: Exception) {
+                                    Toast.makeText(context, "Sign-in error: ${error.message}", Toast.LENGTH_SHORT).show()
                                     isSigningIn = false
                                 }
                             }
                         },
+                        enabled = !isLoading && !isSigningIn,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
@@ -241,13 +290,9 @@ fun LoginScreen(navController: NavController) {
                         }
                     }
 
-                    // Biometric Button
                     OutlinedButton(
-                        onClick = {
-                            navController.navigate("main") {
-                                popUpTo("login") { inclusive = true }
-                            }
-                        },
+                        onClick = { completeBackendLogin() },
+                        enabled = !isLoading && !isSigningIn,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),

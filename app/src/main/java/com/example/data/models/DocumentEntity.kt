@@ -13,5 +13,6 @@ data class DocumentEntity(
     val status: String,
     val qualityScore: Int,
     val aiSummary: String,
-    val dateAdded: String
+    val dateAdded: String,
+    val analysisReady: Boolean = false
 )

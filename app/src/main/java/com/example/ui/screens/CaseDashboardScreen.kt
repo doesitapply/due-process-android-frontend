@@ -8,16 +8,31 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.data.repository.CaseRepository
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CaseDashboardScreen(navController: NavController) {
+fun CaseDashboardScreen(navController: NavController, repository: CaseRepository) {
+    val scope = rememberCoroutineScope()
+    val cases by repository.localCases.collectAsState(initial = emptyList())
+    val documents by repository.localDocuments.collectAsState(initial = emptyList())
+    var syncError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        try {
+            repository.refreshAll()
+        } catch (error: Exception) {
+            syncError = error.message
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
@@ -53,7 +68,7 @@ fun CaseDashboardScreen(navController: NavController) {
                             .padding(horizontal = 8.dp, vertical = 4.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
-                                Text("2 Urgent Deadlines", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                                Text("${documents.count { it.status == "failed" }} Failed Files", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                             }
                         }
                         Box(modifier = Modifier
@@ -61,10 +76,16 @@ fun CaseDashboardScreen(navController: NavController) {
                             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
                             .padding(horizontal = 8.dp, vertical = 4.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                                Text("1 Failed Upload", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.Default.CloudDone, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                                Text("${documents.count { it.status == "completed" }} Ready", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
+                    }
+                }
+
+                if (syncError != null) {
+                    item {
+                        Text(syncError ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
                 }
 
@@ -72,24 +93,21 @@ fun CaseDashboardScreen(navController: NavController) {
                 item {
                     Text("ACTIVE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CaseCard(
-                            court = "District Court",
-                            caseName = "State v. Jamison",
-                            docs = "4,102 Docs",
-                            findings = "89 Findings",
-                            date = "2023-10-24",
-                            status = "SYNCED",
-                            isActive = true
-                        )
-                        CaseCard(
-                            court = "Federal Circuit",
-                            caseName = "TechCorp IP Dispute",
-                            docs = "12,550 Docs",
-                            findings = "312 Findings",
-                            date = "2023-11-02",
-                            status = "PENDING",
-                            isActive = false
-                        )
+                        if (cases.isEmpty()) {
+                            Text("No synced cases yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            cases.forEach { case ->
+                                CaseCard(
+                                    court = case.court,
+                                    caseName = case.name,
+                                    docs = "${case.documentCount} Docs",
+                                    findings = "${case.findingCount} Findings",
+                                    date = case.date.take(10),
+                                    status = case.status.uppercase(),
+                                    isActive = case.isActive
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -119,7 +137,16 @@ fun CaseDashboardScreen(navController: NavController) {
         }
         
         Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-            CaptureFab(onClick = {})
+            CaptureFab(onClick = {
+                scope.launch {
+                    try {
+                        repository.refreshAll()
+                        syncError = null
+                    } catch (error: Exception) {
+                        syncError = error.message
+                    }
+                }
+            })
         }
     }
 }
